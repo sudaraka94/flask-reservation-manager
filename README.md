@@ -1,4 +1,4 @@
-REST-auth
+Flask Reservation Manager
 =========
 
 A simple reservation manage API with flask.
@@ -23,7 +23,7 @@ Running
 
 To run the server use the following command:
 
-    (venv) $ python api.py
+    (venv) $ python server.py
      * Running on http://127.0.0.1:5000/
      * Restarting with reloader
 
