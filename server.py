@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 import os
-from flask import Flask, abort, request, jsonify, g, url_for
+from flask import Flask, abort, request, jsonify, g, url_for, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_httpauth import HTTPBasicAuth
 from passlib.apps import custom_app_context as pwd_context
 from datetime import datetime
-
+from flask_mail import Mail, Message
 
 '''
 |-----------------------------------------------------------------
@@ -20,10 +20,25 @@ app.config['SECRET_KEY'] = 'the quick brown fox jumps over the lazy dog'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
 app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
 
+'''
+|-----------------------------------------------------------------
+| Email Configurations
+|-----------------------------------------------------------------
+'''
+
+app.config.update(
+    DEBUG=True,
+    #EMAIL SETTINGS
+    MAIL_SERVER='smtp.gmail.com',
+    MAIL_PORT=465,
+    MAIL_USE_SSL=True,
+    MAIL_USERNAME = 'uthpala.uvindasiri@gmail.com',
+    MAIL_PASSWORD = 'mwcabjfjuehfgvvn'
+    )
 
 db = SQLAlchemy(app)
 auth = HTTPBasicAuth()
-
+mail = Mail(app)
 '''
 |-----------------------------------------------------------------
 | Number of tables in the restaurent
@@ -51,7 +66,8 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     telephone = db.Column(db.String(32), index=True)
     password_hash = db.Column(db.String(64))
-
+    email= db.Column(db.String(32))
+    name= db.Column(db.String(32))
     def hash_password(self, password):
         self.password_hash = pwd_context.encrypt(password)
 
@@ -89,27 +105,44 @@ def verify_password(telephone, password):
 
 '''
 |-----------------------------------------------------------------
+| Custom error handlers to support json
+|-----------------------------------------------------------------
+'''
+
+@app.errorhandler(404)
+def not_found(error):
+    return make_response(jsonify({'error': 'Not found'}), 404)
+
+'''
+|-----------------------------------------------------------------
 | App Routes
 |-----------------------------------------------------------------
 '''
 
-@app.route('/api/users', methods=['POST'])
+'''
+|-----------------------------------------------------------------
+| Here there is no check implemented for restricting a single  
+| email for single user. Thus two users can user the same email 
+|-----------------------------------------------------------------
+'''
+@app.route('/api/user/add', methods=['POST'])
 def new_user():
     telephone = request.json.get('telephone')
     password = request.json.get('password')
-    if telephone is None or password is None:
-        abort(400)    # missing arguments
+    email = request.json.get('email')
+    name = request.json.get('name')
+    if telephone is None or password is None or email is None or name is None:
+        abort(make_response(jsonify(message="Missing arguments"), 400))    # missing arguments
     if User.query.filter_by(telephone=telephone).first() is not None:
-        abort(400)    # existing user
-    user = User(telephone=telephone)
+        abort(make_response(jsonify(message="A user with the same telephone number exists!"), 400))    # existing user
+    user = User(telephone=telephone,email=email,name=name)
     user.hash_password(password)
     db.session.add(user)
     db.session.commit()
-    return (jsonify({'telephone': user.telephone}), 201,
-            {'Location': url_for('get_user', id=user.id, _external=True)})
+    return (jsonify({'status': 'User added successfully!'}), 201)
 
 
-@app.route('/api/users/<int:id>')
+@app.route('/api/user/<int:id>')
 def get_user(id):
     user = User.query.get(id)
     if not user:
@@ -127,6 +160,9 @@ def make_reservation():
     date=request.json.get('date')
     user_id=request.authorization.username
     
+    #getting user email
+    user=User.query.filter_by(telephone=user_id).first()
+
     #Processing date and creating python datetime object
     date_obj=datetime.strptime(date, '%Y-%m-%d')
     reservations= Reservation.query.filter_by(date=date_obj).count()
@@ -136,9 +172,23 @@ def make_reservation():
         reservation=Reservation(telephone=user_id,date=date_obj)
         db.session.add(reservation)
         db.session.commit()
-        return(jsonify({'status':'Reservation added successfully'}))
 
+        #Sending the email
+        try:
+            msg = Message("Reservation made successfully!",
+              sender="restaurant@gmail.com",
+              recipients=[user.email])
+            message_string = """Hi {0},\nYou have made a reservation successfully in our restaurant on {1}.\nFeel free to contact us for any inquiries. Thank you.\nRestaurant Staff"""           
+            msg.body=message_string.format(user.name,date)
+            mail.send(msg)
+            return(jsonify({'status':'Reservation added successfully'}))
+
+        except Exception as e:
+            return(jsonify({'status':'Reservation added successfully but email not sent'})) 
+
+        
     else :
+        #Cannot make anymore reservations
         return(jsonify({'status':'Reservation adding failed !. We cannot accomodate any more reservations for the mentioned date'}))
 
 
