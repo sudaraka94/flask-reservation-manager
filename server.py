@@ -33,7 +33,7 @@ app.config.update(
     MAIL_PORT=465,
     MAIL_USE_SSL=True,
     MAIL_USERNAME = 'uthpala.uvindasiri@gmail.com',
-    MAIL_PASSWORD = 'mwcabjfjuehfgvvn'
+    MAIL_PASSWORD = '<app password>'
     )
 
 db = SQLAlchemy(app)
