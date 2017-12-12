@@ -32,7 +32,7 @@ app.config.update(
     MAIL_SERVER='smtp.gmail.com',
     MAIL_PORT=465,
     MAIL_USE_SSL=True,
-    MAIL_USERNAME = 'uthpala.uvindasiri@gmail.com',
+    MAIL_USERNAME = '<email to be used to send emails>',
     MAIL_PASSWORD = '<app password>'
     )
 
